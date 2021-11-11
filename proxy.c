@@ -80,7 +80,9 @@ int main(int argc, char **argv)
         Pthread_create(&tid, NULL, thread, NULL);
     while (1) {
         clientlen = sizeof(clientaddr);
+        fprintf(stderr, "Blocking in Accept..\n");
         connfd = Accept(listenfd, (SA*)&clientaddr, &clientlen);
+        fprintf(stderr, "Request from %s\n", inet_ntoa(((struct sockaddr_in *)&clientaddr)->sin_addr));
         sbuf_insert(&sbuf, connfd);
     }
     return 0;
@@ -136,13 +138,11 @@ Node find(Deque d, char * key) {
 }
 
 void doit(int fd) {
-    char buf[MAXLINE], method[MAXLINE], urll[MAXLINE], version[MAXLINE];
-    char * url = urll;
+    char buf[MAXLINE];
     rio_t rio;
     Rio_readinitb(&rio, fd);
-    Rio_readlineb(&rio, buf, MAXLINE);
-    // sscanf(buf, "%s %s %s", method, urll, version);
-    printf("%s\n", buf);
+    printf("Enter thread\n");
+    socks_authenticate(fd);
     /*      
     int clientfd = Open_clientfd(host, port);
     int ans = rio_writen(clientfd, header, strlen(header));
