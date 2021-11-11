@@ -74,9 +74,10 @@ int main(int argc, char **argv)
     Signal(SIGPIPE, handler);
     listenfd = Open_listenfd(argv[1]);
     pthread_t tid;
-    sbuf_init(&sbuf, 16);
+    sbuf_init(&sbuf, 4);
     dequeInit(&cache);
-    for (int i = 0; i < 4; ++i) Pthread_create(&tid, NULL, thread, NULL);
+    for (int i = 0; i < 4; ++i)
+        Pthread_create(&tid, NULL, thread, NULL);
     while (1) {
         clientlen = sizeof(clientaddr);
         connfd = Accept(listenfd, (SA*)&clientaddr, &clientlen);
@@ -140,41 +141,9 @@ void doit(int fd) {
     rio_t rio;
     Rio_readinitb(&rio, fd);
     Rio_readlineb(&rio, buf, MAXLINE);
-    sscanf(buf, "%s %s %s", method, urll, version);
-    if (strcasecmp(method, "GET")) {
-        clienterror(fd, "501 Not implemented");
-        return;
-    }
-    Node n = NULL;
-    
-    P(&readlock);
-    readers++;
-    if (readers == 1) P(&cache.mutex);
-    V(&readlock);
-    
-    n = find(&cache, urll); //reading, support multi-reading
-    
-    P(&readlock);
-    readers--;
-    if (readers == 0) V(&cache.mutex);
-    V(&readlock);
-    
-    if (n != NULL) {
-        P(&cache.mutex);
-        moveToFront(&cache, n);
-        V(&cache.mutex);
-        rio_writen(fd, n->val, n->size);
-        return;
-    }
-    if (url[0] == 'h') url = (char *)url + 7;
-    char host[128], port[8], uri[128];
-    parse_host(url, host, port);
-    parse_uri(url, uri);
-    char header[8192], transfer[MAX_OBJECT_SIZE + 1];
-    sprintf(header,"GET %s HTTP/1.0\r\nHost: %s\r\n", uri, host);
-    parse_hdr(header, &rio);
-    strcat(header, lazy_hdr);
-    
+    // sscanf(buf, "%s %s %s", method, urll, version);
+    printf("%s\n", buf);
+    /*      
     int clientfd = Open_clientfd(host, port);
     int ans = rio_writen(clientfd, header, strlen(header));
     if (ans < 0) {
@@ -192,18 +161,6 @@ void doit(int fd) {
             Close(clientfd);
             return;
         }
-        char * kcopy = malloc(strlen(urll) + 1);
-        strcpy(kcopy, urll);
-        char * val = malloc(read_cnt);        
-        memcpy(val, transfer, read_cnt);
-        Node nn = malloc(sizeof(struct node));
-        nn->key = kcopy;
-        nn->val = val;
-        nn->size = read_cnt;
-        P(&cache.mutex);
-        addFirst(&cache, nn);
-        while (cache.size > MAX_CACHE_SIZE) removeLast(&cache);
-        V(&cache.mutex);
     } else {
         ans = rio_writen(fd, transfer, read_cnt);
         if (ans < 0) {
@@ -219,6 +176,7 @@ void doit(int fd) {
         }
     }
     Close(clientfd);
+    */
 }
 
 void clienterror(int fd, char * message) {
