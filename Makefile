@@ -5,7 +5,7 @@
 # build your proxy from sources.
 
 CC = gcc
-CFLAGS = -std=c99 -Wno-implicit-function-declaration -Wall
+CFLAGS = -Wall
 LDFLAGS = -lpthread
 
 all: proxy
