@@ -4,12 +4,6 @@
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
 
-/* You won't lose style points for including this long line in your code */
-
-//static const char *user_agent_hdr = "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 Firefox/10.0.3\r\n";
-
-static const char * lazy_hdr = "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 Firefox/10.0.3\r\nConnection: close\r\nProxy-Connection: close\r\n\r\n";
-
 typedef struct {
     int * buf;
     int n;
@@ -20,46 +14,15 @@ typedef struct {
     sem_t items;
 } sbuf_t;
 
-typedef struct node * Node;
-struct node {
-    Node pre;
-    Node next;
-    char * key;
-    char * val;
-    int size;
-};
-
-typedef struct deque * Deque; 
-struct deque {
-    struct node sentinel;
-    int size;
-    sem_t mutex;
-};
-
-struct deque cache;
-
 void doit(int fd);
-void clienterror(int fd, char * msg);
-void parse_host(char * url, char * host, char * port);
-void parse_uri(char * url, char * uri);
-void parse_hdr(char * header, rio_t * rp);
 void sbuf_init(sbuf_t * sp, int n);
 void sbuf_deinit(sbuf_t * sp);
 void sbuf_insert(sbuf_t * sp, int item);
 int sbuf_remove(sbuf_t * sp);
 void * thread(void * vargp);
 void handler(int sig);
-void conn(Node pre, Node next);
-void moveToFront(Deque d, Node n);
-void addFirst(Deque d, Node n);
-Node removeLast(Deque d);
-void dequeInit(Deque d);
-Node find(Deque d, char * key);
-void nodeDeinit(Node n);
 
 sbuf_t sbuf;
-int readers;
-sem_t readlock;
 
 int main(int argc, char **argv)
 {
@@ -75,7 +38,6 @@ int main(int argc, char **argv)
     listenfd = Open_listenfd(argv[1]);
     pthread_t tid;
     sbuf_init(&sbuf, 32);
-    dequeInit(&cache);
     for (int i = 0; i < 32; ++i)
         Pthread_create(&tid, NULL, thread, NULL);
     while (1) {
@@ -87,55 +49,7 @@ int main(int argc, char **argv)
     }
     return 0;
 }
-void conn(Node pre, Node next) {
-    pre->next = next;
-    next->pre = pre;
-}
-void moveToFront(Deque d, Node n) {
-    Node sentinel = &d->sentinel;
-    if (sentinel->next == n) return;
-    conn(n->pre, n->next);
-    Node front = sentinel->next;
-    conn(sentinel, n);
-    conn(n, front);
-}
-void addFirst(Deque d, Node n) {
-    Node sentinel = &d->sentinel;
-    Node front = sentinel->next;
-    conn(sentinel, n);
-    conn(n, front);
-    d->size += n->size;
-}
-Node removeLast(Deque d) {
-    Node sentinel = &d->sentinel;
-    Node back = sentinel->pre;
-    Node secondback = back->pre;
-    conn(secondback, sentinel);
-    d->size -= back->size;
-    nodeDeinit(back);
-    return back;
-}
-void dequeInit(Deque d) {
-    conn(&d->sentinel, &d->sentinel);
-    sem_init(&d->mutex, 0, 1);
-    d->size = 0;
-}
 
-void nodeDeinit(Node n) {
-    free(n->key);
-    free(n->val);
-    free(n);
-}
-
-Node find(Deque d, char * key) {
-    Node sentinel = &d->sentinel;
-    Node start = sentinel->next;
-    while (start != sentinel) {
-        if (!strcmp(key, start->key)) return start;
-        start = start->next;
-    }
-    return NULL;
-}
 
 void doit(int client_proxy_fd) {
     char host[128], port[8];
@@ -150,87 +64,9 @@ void doit(int client_proxy_fd) {
     }
    // int proxy_server_fd = Open_clientfd(host, port);
     printf("Built up connection with %s\n", host);
-    // int proxy_server_fd = Open_clientfd(host, port);
 
     socks_serve(client_proxy_fd, proxy_server_fd);
     Close(proxy_server_fd);
-    /*
-    int ans = rio_writen(clientfd, header, strlen(header));
-    if (ans < 0) {
-        Close(clientfd);
-        return;
-    }
-    int read_cnt = rio_readn(clientfd, transfer, MAX_OBJECT_SIZE + 1);
-    if (read_cnt < 0) {
-        Close(clientfd);
-        return;
-    }
-    if (read_cnt <= MAX_OBJECT_SIZE) {
-        ans = rio_writen(fd, transfer, read_cnt);
-        if (ans < 0) {
-            Close(clientfd);
-            return;
-        }
-    } else {
-        ans = rio_writen(fd, transfer, read_cnt);
-        if (ans < 0) {
-            Close(clientfd);
-            return;
-        }
-        while ((read_cnt = rio_readn(clientfd, transfer, MAX_OBJECT_SIZE)) > 0) {
-            ans = rio_writen(fd, transfer, read_cnt);
-            if (ans < 0) {
-                Close(clientfd);
-                return;
-            }
-        }
-    }
-    */
-}
-
-void clienterror(int fd, char * message) {
-    Rio_writen(fd, message, strlen(message));
-    return;
-}
-
-void parse_hdr(char * header, rio_t * rp) {
-    char buf[1024];
-    Rio_readlineb(rp, buf, 1024);
-    while (strcmp(buf, "\r\n")) {
-        char h[128];
-        int i = 0;
-        for (; buf[i] != ':'; ++i) h[i] = buf[i];
-        h[i] = '\0';
-        if (strcmp(h, "Host") && strcmp(h, "User-Agent") && strcmp(h, "Connection") && strcmp(h, "Proxy-Connection")) strcat(header, buf);
-        Rio_readlineb(rp, buf, 1024);
-    }
-    return;
-}
-
-void parse_host(char * url, char * host, char * port) {
-    int colon_pos = 0, slash_pos = 0, i = 0, j = 0;
-    for (; url[slash_pos] != '/'; ++slash_pos) {
-        if (url[slash_pos] == ':') colon_pos = slash_pos;
-    }
-    if (colon_pos == 0) {
-        port[0] = '8', port[1] = '0', port[2] = '\0';
-        for (; i < slash_pos; ++i) host[i] = url[i];
-        host[slash_pos] = '\0';
-    } else {
-        for (; i < colon_pos; ++i) host[i] = url[i];
-        for (++i; i < slash_pos; ++i, ++j) port[j] = url[i];
-        host[colon_pos] = '\0', port[j] = '\0';
-    }
-    return;
-}
-void parse_uri(char * url, char * uri) {
-    int slash_pos = 0, j = 0;
-    while (url[slash_pos] != '/') ++slash_pos;
-    for (; url[slash_pos]; ++slash_pos, ++j) {
-        uri[j] = url[slash_pos];
-    }
-    uri[j] = '\0';
-    return;
 }
 
 void sbuf_init(sbuf_t * sp, int n) {
