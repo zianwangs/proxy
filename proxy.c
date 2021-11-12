@@ -26,7 +26,6 @@ sbuf_t sbuf;
 
 int main(int argc, char **argv)
 {
-    sem_init(&readlock, 0, 1);
     int listenfd, connfd;
     socklen_t clientlen;
     struct sockaddr_storage clientaddr;
