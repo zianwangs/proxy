@@ -23,7 +23,7 @@ void * thread(void * vargp);
 void handler(int sig);
 
 sbuf_t sbuf;
-
+int numOfTask = 0;
 int main(int argc, char **argv)
 {
     int listenfd, connfd;
@@ -44,6 +44,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "Blocking in Accept..\n");
         connfd = Accept(listenfd, (SA*)&clientaddr, &clientlen);
         fprintf(stderr, "Request from %s\n", inet_ntoa(((struct sockaddr_in *)&clientaddr)->sin_addr));
+        
         sbuf_insert(&sbuf, connfd);
     }
     return 0;
@@ -94,6 +95,8 @@ int sbuf_remove(sbuf_t *sp) {
     P(&sp->items);
     P(&sp->mutex);
     item = sp->buf[(++sp->front) % (sp->n)];
+    ++numOfTask;
+    printf("Task pushed, running tasks: %d\n", numOfTask);
     V(&sp->mutex);
     V(&sp->slots);
     return item;
@@ -104,6 +107,8 @@ void * thread(void * vargp) {
     while (1) {
         int connfd = sbuf_remove(&sbuf);
         doit(connfd);
+        --numOfTask;
+        printf("Task poped, running tasks: %d\n", numOfTask);
         Close(connfd);
     }
 }
