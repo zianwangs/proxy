@@ -74,9 +74,9 @@ int main(int argc, char **argv)
     Signal(SIGPIPE, handler);
     listenfd = Open_listenfd(argv[1]);
     pthread_t tid;
-    sbuf_init(&sbuf, 4);
+    sbuf_init(&sbuf, 32);
     dequeInit(&cache);
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 32; ++i)
         Pthread_create(&tid, NULL, thread, NULL);
     while (1) {
         clientlen = sizeof(clientaddr);
@@ -137,14 +137,24 @@ Node find(Deque d, char * key) {
     return NULL;
 }
 
-void doit(int fd) {
-    char buf[MAXLINE];
+void doit(int client_proxy_fd) {
+    char host[128], port[8];
     rio_t rio;
-    Rio_readinitb(&rio, fd);
+    Rio_readinitb(&rio, client_proxy_fd);
     printf("Enter thread\n");
-    socks_authenticate(fd);
-    /*      
-    int clientfd = Open_clientfd(host, port);
+
+    int proxy_server_fd = socks_authenticate(client_proxy_fd, host, port);
+    if (proxy_server_fd < 0) {
+        printf("Invalid DNAME\n");
+        return;
+    }
+   // int proxy_server_fd = Open_clientfd(host, port);
+    printf("Built up connection with %s\n", host);
+    // int proxy_server_fd = Open_clientfd(host, port);
+
+    socks_serve(client_proxy_fd, proxy_server_fd);
+    Close(proxy_server_fd);
+    /*
     int ans = rio_writen(clientfd, header, strlen(header));
     if (ans < 0) {
         Close(clientfd);
@@ -175,7 +185,6 @@ void doit(int fd) {
             }
         }
     }
-    Close(clientfd);
     */
 }
 

@@ -1016,9 +1016,16 @@ int open_listenfd(char *port)
             continue;  /* Socket failed, try the next */
 
         /* Eliminates "Address already in use" error from bind */
-        setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR,    //line:netp:csapp:setsockopt
-                   (const void *)&optval , sizeof(int));
-
+        setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval , sizeof(int));
+        /*
+setsockopt(
+      listenfd,     // Socket descriptor
+      SOL_SOCKET, // To manipulate options at the sockets API level
+      SO|SO_RCVTIMEO,// Specify the receiving or sending timeouts 
+      (const void *)&optval, // option values
+      sizeof(int) 
+  ); 
+  */
         /* Bind the descriptor to the address */
         if (bind(listenfd, p->ai_addr, p->ai_addrlen) == 0)
             break; /* Success */
