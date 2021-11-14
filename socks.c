@@ -14,7 +14,7 @@ static void non_block_fd(int fd) {
 int socks_pwd_authen(int fd) {
     char buf[128];
     short pwd_authen = 0x0205;
-    int wc = write(fd, (char*)&pwd_authen, 2);
+    rio_writen(fd, (char*)&pwd_authen, 2);
     char username[256], pwd[256];
     read(fd, buf, 2);
     read(fd, username, buf[1]);
@@ -23,12 +23,12 @@ int socks_pwd_authen(int fd) {
     read(fd, pwd, buf[0]);
     pwd[buf[0]] = '\0';
     if (strcmp(username, "abc") || strcmp(pwd, "123")) {
-        printf("Authentication failed\n");
+        printf("Password authentication failed\n");
         pwd_authen = 0x0105;
-        rio_writen(fd, (char*)pwd_authen, 2);
+        rio_writen(fd, (char*)&pwd_authen, 2);
         return -1;
     }
-    printf("Password Authentication succeeded\n");
+    printf("Password authentication succeeded\n");
     return 0;
 }
 
