@@ -66,6 +66,7 @@ void doit(int client_proxy_fd) {
     printf("Built up connection with %s\n", host);
 
     socks_serve(client_proxy_fd, proxy_server_fd);
+    printf("Nothing to read from %s, end session\n", host);
     Close(proxy_server_fd);
 }
 

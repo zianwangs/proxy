@@ -1,7 +1,7 @@
 #include "csapp.h"
 #include "poll.h"
 #define MAX_READ (1 << 17)
-
+int socks_pwd_authen(int);
 int socks_authenticate(int, char*, char*);
 void socks_serve(int, int);
 
@@ -11,18 +11,41 @@ static void non_block_fd(int fd) {
     fcntl(fd, F_SETFL, flags);
 }
 
+int socks_pwd_authen(int fd) {
+    char buf[128];
+    short pwd_authen = 0x0205;
+    int wc = write(fd, (char*)&pwd_authen, 2);
+    char username[256], pwd[256];
+    read(fd, buf, 2);
+    read(fd, username, buf[1]);
+    username[buf[1]] == '\0';
+    read(fd, buf, 1);
+    read(fd, pwd, buf[0]);
+    pwd[buf[0]] = '\0';
+    if (strcmp(username, "abc") || strcmp(pwd, "123")) {
+        printf("Authentication failed\n");
+        pwd_authen = 0x0105;
+        rio_writen(fd, (char*)pwd_authen, 2);
+        return -1;
+    }
+    printf("Password Authentication succeeded\n");
+    return 0;
+}
+
 int socks_authenticate(int fd, char* host, char* port) {
-    unsigned char buf[128];
+    unsigned char buf[128] = {0};
     printf("Ready to receive socks5 handshake\n");
-    int cnt = rio_readn(fd, buf, 3);
-    printf("Handshake received, Ver:%x NM:%x M:%x\n", buf[0], buf[1], buf[2]);
+    int cnt = read(fd, buf, 6);
+    printf("Handshake received %d bytes, Ver:%x NM:%x M:%x %x %x\n",cnt, buf[0], buf[1], buf[2], buf[3], buf[4]);
+    if (buf[2] == 0x02 || buf[3] == 0x02 || buf[4] == 0x02) 
+        if (socks_pwd_authen(fd) == -1)  
+            return -1; 
     short NO_AUTHEN = 0x0005;
     char* handshake_reply = &NO_AUTHEN;
     rio_writen(fd, (char*)handshake_reply, 2);
     printf("Handshake replied, ready to process requests\n");
     cnt = recv(fd, buf, 4, 0);
     cnt += recv(fd, buf + 4, 64, 0);
-    printf("Request received %d bytes\n",cnt);
     int dst_port = buf[cnt - 2] * 256 + buf[cnt - 1];
     sprintf(port, "%d", dst_port);
     if (buf[3] == 0x01) {
@@ -40,7 +63,7 @@ int socks_authenticate(int fd, char* host, char* port) {
     SUCCESS_REPLY[0] = 5, SUCCESS_REPLY[1] = proxy_server_fd > 0 ? 0 : 4;
     SUCCESS_REPLY[2] = 0, SUCCESS_REPLY[3] = 1, SUCCESS_REPLY[4] = 3;
     SUCCESS_REPLY[5] = 16, SUCCESS_REPLY[6] = 159, SUCCESS_REPLY[7] = 128;
-    SUCCESS_REPLY[8] = 0, SUCCESS_REPLY[9] = 80;
+    SUCCESS_REPLY[8] = 10, SUCCESS_REPLY[9] = 80;
     rio_writen(fd, SUCCESS_REPLY, 10);
     printf("Reply sent, handshake done\n");
     return proxy_server_fd;
@@ -75,6 +98,4 @@ void socks_serve(int client_proxy_fd, int proxy_server_fd) {
         if (errno == ECONNRESET) break;
     }
     // EINTR, EPIPE, EWOULDBLOCK, EAGAIN
-    printf("Nothing to read from client, end session\n");
-
 }
