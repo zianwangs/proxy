@@ -2,5 +2,8 @@
 Only works on Linux
 $ make
 $ sudo ./proxy 1080
+
+Test pwd authen
+$ curl --socks5-hostname username:pwd@ip:port request_address
 ####################################################################
 
