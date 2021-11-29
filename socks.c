@@ -50,8 +50,21 @@ int socks_authenticate(int fd, char* host, char* port) {
     sprintf(port, "%d", dst_port);
     if (buf[3] == 0x01) {
         printf("IPv4:%d.%d.%d.%d, Port:%d\n", buf[4],buf[5],buf[6],buf[7],dst_port);
-        memcpy(host, buf + 4, 4);
-        host[4] = '\0';
+        sprintf(host, "%d.%d.%d.%d", buf[4], buf[5], buf[6], buf[7]);
+        /*
+        struct sockaddr sa;
+        sa.sa_family = AF_INET;
+        if (inet_pton(AF_INET, host, sa.sa_data + 2) != 1) {
+            printf("IPv4 invalid\n");
+            return -1;
+        }
+        // memcpy(sa.sa_data, buf + 4, 4);
+        if (getnameinfo(&sa, sizeof(sa), host, 128, NULL, 0, 0) != 0) {
+            printf("IPv4 invalid\n");
+            return -1;
+        }
+        printf("IPv4->DNAME:%s\n", host);
+        */
     } else if (buf[3] == 0x03) {
         buf[cnt - 2] = '\0';
         memcpy(host, buf + 5, cnt - 6);
